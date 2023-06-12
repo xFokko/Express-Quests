@@ -1,8 +1,33 @@
-const database = require("./database.js");
+const database = require("./database");
 
 const getUsers = (req, res) => {
+  const initialSql = "select id, firstname, lastname, email, city, language from users";
+  const where = [];
+
+  if (req.query.city != null) {
+    where.push({
+      column: "city",
+      value: req.query.city,
+      operator: "=",
+    });
+  }
+  if (req.query.language != null) {
+    where.push({
+      column: "language",
+      value: req.query.language,
+      operator: "=",
+    });
+  }
+
   database
-    .query("select * from users")
+    .query(
+      where.reduce(
+        (sql, { column, operator }, index) =>
+          `${sql} ${index === 0 ? "where" : "and"} ${column} ${operator} ?`,
+        initialSql
+      ),
+      where.map(({ value }) => value)
+    )
     .then(([users]) => {
       res.json(users);
     })
@@ -16,10 +41,13 @@ const getUserById = (req, res) => {
   const id = parseInt(req.params.id);
 
   database
-    .query("select * from users where id = ?", [id])
-    .then(([user]) => {
-      if (user[0] != null) {
-        res.json(user[0]);
+    .query(
+      "select id, firstname, lastname, email, city, language from users where id = ?",
+      [id]
+    )
+    .then(([users]) => {
+      if (users[0] != null) {
+        res.json(users[0]);
       } else {
         res.status(404).send("Not Found");
       }
@@ -31,12 +59,13 @@ const getUserById = (req, res) => {
 };
 
 const postUser = (req, res) => {
-  const { firstname, lastname, email, city, language } = req.body;
+  const { firstname, lastname, email, city, language, hashedPassword } =
+    req.body;
 
   database
     .query(
-      "INSERT INTO users (firstname, lastname, email, city, language) VALUES (?, ?, ?, ?, ?)",
-      [firstname, surname, email, city, birthday]
+      "INSERT INTO users(firstname, lastname, email, city, language, hashedPassword) VALUES (?, ?, ?, ?, ?, ?)",
+      [firstname, lastname, email, city, language, hashedPassword]
     )
     .then(([result]) => {
       res.location(`/api/users/${result.insertId}`).sendStatus(201);
@@ -83,7 +112,7 @@ const deleteUser = (req, res) => {
     })
     .catch((err) => {
       console.error(err);
-      res.status(500).send("Error deleting the movie");
+      res.status(500).send("Error deleting the user");
     });
 };
 
